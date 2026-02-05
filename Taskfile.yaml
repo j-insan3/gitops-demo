@@ -46,6 +46,7 @@ tasks:
     desc: Apply app-of-apps.yaml to the Kubernetes cluster
     cmds:
       - kubectl apply -f app-of-apps.yaml
+      - echo "Applying app-of-apps application"
 
   get-argocd-password:
     desc: Get the initial ArgoCD admin password
