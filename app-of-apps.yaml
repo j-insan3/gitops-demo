@@ -8,6 +8,8 @@ spec:
     repoURL: https://gitlab.com/joelvdvoort/gitops-demo.git
     targetRevision: main
     path: applications/
+    directory:
+      recurse: true
   destination:
     server: https://kubernetes.default.svc # ArgoCD draait op dit lokale destination
   syncPolicy:
