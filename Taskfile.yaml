@@ -1,0 +1,83 @@
+version: "3"
+
+tasks:
+  create-cluster:
+    desc: Create a kind cluster
+    cmds:
+      - kind create cluster --name gitops-demo --wait 5m
+    status:
+      - kind get clusters | grep -q gitops-demo
+
+  delete-cluster:
+    desc: Delete the kind cluster
+    cmds:
+      - kind delete cluster --name gitops-demo
+
+  install-argocd:
+    desc: Install ArgoCD on the cluster
+    deps:
+      - create-cluster
+    cmds:
+      - kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+      - kubectl apply -k https://github.com/argoproj/argo-cd/manifests/crds\?ref\=stable --server-side
+      - kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml --server-side
+      - echo "Waiting for ArgoCD to be ready..."
+      - kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd
+
+  disable-argocd-auth:
+    desc: Disable ArgoCD authentication for anonymous access
+    cmds:
+      - |
+        kubectl patch configmap argocd-cm -n argocd --type merge -p '{
+          "data": {
+            "users.anonymous.enabled": "true"
+          }
+        }'
+      - |
+        kubectl patch configmap argocd-rbac-cm -n argocd --type merge -p '{
+          "data": {
+            "policy.default": "role:admin"
+          }
+        }'
+      - kubectl rollout restart deployment argocd-server -n argocd
+      - echo "ArgoCD authentication disabled. Anonymous users have admin access."
+
+  apply-app-of-apps:
+    desc: Apply app-of-apps.yaml to the Kubernetes cluster
+    cmds:
+      - kubectl apply -f app-of-apps.yaml
+
+  get-argocd-password:
+    desc: Get the initial ArgoCD admin password
+    cmds:
+      - kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d && echo
+
+  port-forward-argocd:
+    desc: Port forward ArgoCD server to localhost:8080
+    cmds:
+      - kubectl port-forward svc/argocd-server -n argocd 8080:80
+
+  bootstrap:
+    desc: Bootstrap everything - create cluster and install ArgoCD
+    cmds:
+      - task: create-cluster
+      - task: install-argocd
+      - task: disable-argocd-auth
+      - task: apply-app-of-apps
+      - echo "ArgoCD is ready!"
+      - echo "Access ArgoCD UI with 'task port-forward-argocd' then navigate to http://localhost:8080"
+      - echo "Authentication is disabled - no login required"
+
+  status:
+    desc: Check cluster and ArgoCD status
+    cmds:
+      - echo "Kind clusters:"
+      - kind get clusters
+      - echo ""
+      - echo "ArgoCD pods:"
+      - kubectl get pods -n argocd
+
+  cleanup:
+    desc: Clean up everything
+    cmds:
+      - task: delete-cluster

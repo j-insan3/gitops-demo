@@ -1,0 +1,16 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app-of-apps
+spec:
+  project: default
+  source:
+    repoURL: https://gitlab.com/joelvdvoort/gitops-demo.git
+    targetRevision: main
+    path: applications/
+  destination:
+    server: https://kubernetes.default.svc # ArgoCD draait op dit lokale destination
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
